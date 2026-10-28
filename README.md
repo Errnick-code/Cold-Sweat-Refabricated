@@ -3,6 +3,8 @@
 <img src="https://i.imgur.com/N6amWeJ.png" alt="Cold Sweat" width="403" />
 <br><br>
 
+[Download](https://modrinth.com/mod/cold-sweat-refabricated)
+
 **Cold Sweat Refabricated** is an unofficial port of [Cold Sweat](https://modrinth.com/mod/cold-sweat) by iMikul, chubbymomo and skinnymomo. All credit for the mod, its code, textures and balance goes to the original authors. The original source is on [GitHub](https://github.com/Momo-Softworks/Cold-Sweat).
 
 Cold Sweat is a Vanilla-friendly, deeply customizeable, and performant temperature mod for Minecraft. It leverages an advanced temperature system to give a well-rounded experience, packed with features that help or harm you.
