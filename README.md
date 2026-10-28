@@ -48,7 +48,7 @@ A prepared player can weather the elements of Minecraft's hostile environments, 
 
 ![](https://i.imgur.com/W9vKlTk.png)
 
-![Please do not use Configured with this mod](https://imgur.com/wUkB0JE.png)
+
 
 ## **~ Special Integration With ~**
 
