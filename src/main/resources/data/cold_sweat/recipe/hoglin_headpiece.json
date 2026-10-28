@@ -1,0 +1,14 @@
+{
+    "type":  "minecraft:crafting_shaped",
+    "pattern":  [
+                    "HHH",
+                    "H H"
+                ],
+    "key":  {
+                "H":  "#c:leathers/hoglin"
+            },
+    "result":  {
+                   "id":  "cold_sweat:hoglin_helmet",
+                   "count":  1
+               }
+}

@@ -1,0 +1,238 @@
+package com.momosoftworks.coldsweat.common.block;
+
+import net.fabricmc.api.Environment;
+
+import net.fabricmc.api.EnvType;
+
+import com.momosoftworks.coldsweat.common.blockentity.HearthBlockEntity;
+import com.momosoftworks.coldsweat.config.ConfigSettings;
+import com.momosoftworks.coldsweat.core.init.ModBlockEntities;
+import com.momosoftworks.coldsweat.core.init.ModBlocks;
+import com.momosoftworks.coldsweat.core.init.ModSounds;
+import com.momosoftworks.coldsweat.util.item.ItemStackHelper;
+import com.momosoftworks.coldsweat.util.math.CSMath;
+import com.momosoftworks.coldsweat.util.world.WorldHelper;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.core.Direction;
+import net.minecraft.core.Vec3i;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.Containers;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.item.BucketItem;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.component.UseRemainder;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.item.context.BlockPlaceContext;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.BlockGetter;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.redstone.Orientation;
+import net.minecraft.world.level.block.*;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.entity.BlockEntityTicker;
+import net.minecraft.world.level.block.entity.BlockEntityType;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.StateDefinition;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.world.level.block.state.properties.BooleanProperty;
+import net.minecraft.world.level.block.state.properties.EnumProperty;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.Vec3;
+
+import javax.annotation.Nullable;
+import java.util.Random;
+
+public class HearthBottomBlock extends Block implements EntityBlock
+{
+    public static final EnumProperty<Direction> FACING = BlockStateProperties.HORIZONTAL_FACING;
+    public static final BooleanProperty COOLING = BooleanProperty.create("cooling");
+    public static final BooleanProperty HEATING = BooleanProperty.create("heating");
+    public static final BooleanProperty LIT = BlockStateProperties.LIT;
+    public static final BooleanProperty FROSTED = BooleanProperty.create("frosted");
+    public static final BooleanProperty SMART = BooleanProperty.create("smart");
+
+    public static Properties getProperties()
+    {
+        return Properties
+                .of()
+                .sound(SoundType.STONE)
+                .destroyTime(2.0F)
+                .explosionResistance(10.0F)
+                .requiresCorrectToolForDrops()
+                .isRedstoneConductor((state, level, pos) -> false)
+                .lightLevel(state -> state.getValue(LIT) ? 13 : 0)
+                .noOcclusion();
+    }
+
+    public static Item.Properties getItemProperties()
+    {   return new Item.Properties().stacksTo(1);
+    }
+
+    public HearthBottomBlock(Properties properties)
+    {
+        super(properties);
+        this.registerDefaultState(this.defaultBlockState().setValue(FACING, Direction.NORTH)
+                                                          .setValue(COOLING, false)
+                                                          .setValue(HEATING, false)
+                                                          .setValue(LIT, false)
+                                                          .setValue(FROSTED, false)
+                                                          .setValue(SMART, false));
+    }
+
+    @Nullable
+    @Override
+    public <T extends BlockEntity> BlockEntityTicker<T> getTicker(Level level, BlockState state, BlockEntityType<T> type)
+    {   return type == ModBlockEntities.HEARTH.value() ? HearthBlockEntity::tickSelf : null;
+    }
+
+    public RenderShape getRenderShape(BlockState pState)
+    {   return RenderShape.INVISIBLE;
+    }
+
+    @Nullable
+    @Override
+    public BlockEntity newBlockEntity(BlockPos pos, BlockState state)
+    {   return new HearthBlockEntity(pos, state);
+    }
+
+    @Override
+    public InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos, Player player, BlockHitResult rayTraceResult)
+    {
+        if (level.getBlockEntity(pos) instanceof HearthBlockEntity te)
+        {   player.openMenu(new com.momosoftworks.coldsweat.common.container.PosMenuProvider<>(te.getDisplayName(), pos, com.momosoftworks.coldsweat.common.container.HearthContainer::new));
+        }
+        return super.useWithoutItem(state, level, pos, player, rayTraceResult);
+    }
+
+    @SuppressWarnings("deprecation")
+    @Override
+    public InteractionResult useItemOn(ItemStack stack, BlockState state, Level level, BlockPos pos, Player player, InteractionHand hand, BlockHitResult rayTraceResult)
+    {
+        if (level.getBlockEntity(pos) instanceof HearthBlockEntity te)
+        {
+            // If the held item is fuel, try to insert the fuel
+            int itemFuel = te.getItemFuel(stack);
+            int hearthFuel = itemFuel > 0 ? te.getHotFuel() : te.getColdFuel();
+
+            if (itemFuel != 0 && hearthFuel + Math.abs(itemFuel) * 0.75 < te.getMaxFuel())
+            {
+                // Consume the item if not in creative
+                if (!player.isCreative())
+                {
+                    UseRemainder useRemainder = stack.get(DataComponents.USE_REMAINDER);
+                    if (useRemainder != null)
+                    {
+                        ItemStack container = useRemainder.convertInto().create();
+                        player.setItemInHand(hand, container);
+                    }
+                    else
+                    {   stack.shrink(1);
+                    }
+                }
+                // Add the fuel
+                te.addFuel(itemFuel);
+
+                // Play the fuel filling sound
+                level.playSound(null, pos, itemFuel > 0
+                                             ? SoundEvents.BUCKET_EMPTY_LAVA
+                                             : ModSounds.BUCKET_EMPTY_SLUSH.value(),
+                                  SoundSource.BLOCKS, 1.0F, 0.9f + new Random().nextFloat() * 0.2F);
+            }
+            else player.openMenu(new com.momosoftworks.coldsweat.common.container.PosMenuProvider<>(te.getDisplayName(), pos, com.momosoftworks.coldsweat.common.container.HearthContainer::new));
+        }
+        return InteractionResult.SUCCESS;
+    }
+
+    @Environment(EnvType.CLIENT)
+    @Override
+    public void animateTick(BlockState state, Level level, BlockPos pos, RandomSource random)
+    {
+        HearthBlockEntity hearth = (HearthBlockEntity) level.getBlockEntity(pos);
+        if (hearth != null && hearth.isUsingColdFuel())
+        {   IceboxBlock.createMistParticles(level, pos);
+        }
+        if (state.getValue(LIT))
+        {   BoilerBlock.createFlameParticles(level, pos, state, 0.6, 0.1);
+        }
+    }
+
+    @Override
+    public void setPlacedBy(Level level, BlockPos pos, BlockState state, LivingEntity entity, ItemStack item)
+    {   level.setBlock(pos.above(), WorldHelper.waterlog(ModBlocks.HEARTH_TOP.value().defaultBlockState(), level, pos.above()), 3);
+    }
+
+    @Override
+    public void neighborChanged(BlockState state, Level level, BlockPos pos, Block neighborBlock, Orientation orientation, boolean isMoving)
+    {
+        super.neighborChanged(state, level, pos, neighborBlock, orientation, isMoving);
+        if (level.getBlockState(pos.above()).getBlock() != ModBlocks.HEARTH_TOP.value())
+        {   this.destroy(level, pos, state);
+        }
+        else
+        {   // Check for redstone power to this block
+            HearthBlockEntity hearth = (HearthBlockEntity) level.getBlockEntity(pos);
+            if (hearth != null)
+            {   hearth.checkInputSignal();
+                hearth.checkForStateChange();
+            }
+        }
+    }
+
+    @Override
+    public void affectNeighborsAfterRemoval(BlockState state, ServerLevel level, BlockPos pos, boolean isMoving)
+    {
+        super.affectNeighborsAfterRemoval(state, level, pos, isMoving);
+        if (!isMoving)
+        {
+            if (level.getBlockState(pos.above()).getBlock() == ModBlocks.HEARTH_TOP.value())
+            {   level.destroyBlock(pos.above(), false);
+            }
+            if (level.getBlockEntity(pos) instanceof HearthBlockEntity te)
+            {   Containers.dropContents(level, pos, te);
+            }
+        }
+    }
+
+    @Override
+    public BlockState rotate(BlockState state, Rotation direction)
+    {   return state.setValue(FACING, direction.rotate(state.getValue(FACING)));
+    }
+
+    @Override
+    protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder)
+    {   builder.add(FACING, COOLING, HEATING, LIT, FROSTED, SMART);
+    }
+
+    @Override
+    public BlockState getStateForPlacement(BlockPlaceContext context)
+    {
+        Level level = context.getLevel();
+        return level.getBlockState(context.getClickedPos().above()).canBeReplaced()
+               ? this.defaultBlockState().setValue(FACING, context.getHorizontalDirection().getOpposite())
+                                         .setValue(SMART, ConfigSettings.SMART_HEARTH.get())
+               : null;
+    }
+
+    @Override
+    public boolean isSignalSource(BlockState pState)
+    {   return true;
+    }
+
+    @Override
+    public boolean hasAnalogOutputSignal(BlockState pState)
+    {   return true;
+    }
+
+    @Override
+    public int getAnalogOutputSignal(BlockState pState, Level level, BlockPos pos, @Nullable Direction direction)
+    {   return AbstractContainerMenu.getRedstoneSignalFromBlockEntity(level.getBlockEntity(pos));
+    }
+}

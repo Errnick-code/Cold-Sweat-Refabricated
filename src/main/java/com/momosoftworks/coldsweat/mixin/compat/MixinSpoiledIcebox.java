@@ -1,0 +1,55 @@
+package com.momosoftworks.coldsweat.mixin.compat;
+
+import com.momosoftworks.coldsweat.ColdSweat;
+import com.momosoftworks.coldsweat.common.blockentity.IceboxBlockEntity;
+import com.mrbysco.spoiled.config.SpoiledConfigCache;
+import com.mrbysco.spoiled.handler.SpoilHandler;
+import net.minecraft.core.BlockPos;
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import com.momosoftworks.coldsweat.core.event.compat.LevelTickEvent;
+import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.Redirect;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.LocalCapture;
+
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+
+@Mixin(SpoilHandler.class)
+public class MixinSpoiledIcebox
+{
+    private static BlockEntity BE;
+    @Inject(method = "onWorldTick", at = @At(value = "INVOKE", target = "Ljava/util/Map;get(Ljava/lang/Object;)Ljava/lang/Object;"), locals = LocalCapture.CAPTURE_FAILHARD)
+    private void storeBlockEntity(LevelTickEvent.Post event, CallbackInfo ci,
+                                  // locals
+                                  ServerLevel level, List blockEntityPositions, Iterator var4, BlockPos pos, BlockEntity be)
+    {   BE = be;
+    }
+
+
+    @Redirect(method = "onWorldTick", at = @At(value = "INVOKE", target = "Ljava/util/Map;get(Ljava/lang/Object;)Ljava/lang/Object;"))
+    private Object onFoodRot(Map<Identifier, Double> instance, Object o)
+    {
+        if (BE instanceof IceboxBlockEntity icebox && icebox.getFuel() > 0)
+        {
+            icebox.drainColdFuel(1, true);
+            return 0.0;
+        }
+        return instance.get(o);
+    }
+
+    @Mixin(SpoiledConfigCache.class)
+    public static class ContainerModifier
+    {
+        @Inject(method = "generateContainerModifier", at = @At("TAIL"))
+        private static void addIceboxConfig(List<? extends String> containerValues, List<? extends String> itemContainerValues, CallbackInfo ci)
+        {
+            SpoiledConfigCache.containerModifier.put(Identifier.fromNamespaceAndPath(ColdSweat.MOD_ID, "icebox"), 0.5);
+        }
+    }
+}

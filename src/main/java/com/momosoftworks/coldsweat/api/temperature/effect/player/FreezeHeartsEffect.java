@@ -1,0 +1,87 @@
+package com.momosoftworks.coldsweat.api.temperature.effect.player;
+
+import net.minecraft.world.level.Level;
+import com.momosoftworks.coldsweat.util.ClientOnlyHelper;
+import net.minecraft.client.renderer.RenderPipelines;
+import net.minecraft.client.gui.Gui;
+import com.momosoftworks.coldsweat.ColdSweat;
+import com.momosoftworks.coldsweat.api.event.vanilla.RenderHeartEvent;
+import com.momosoftworks.coldsweat.api.temperature.effect.TempEffect;
+import com.momosoftworks.coldsweat.api.temperature.effect.TempEffectType;
+import com.momosoftworks.coldsweat.config.ConfigSettings;
+import com.momosoftworks.coldsweat.core.init.ModEffects;
+import com.momosoftworks.coldsweat.data.codec.util.IntegerBounds;
+import com.momosoftworks.coldsweat.util.math.CSMath;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Gui;
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.entity.LivingEntity;
+import com.momosoftworks.coldsweat.core.event.SubscribeEvent;
+import com.momosoftworks.coldsweat.core.event.compat.client.RenderFrameEvent;
+
+public class FreezeHeartsEffect extends TempEffect
+{
+    public FreezeHeartsEffect(TempEffectType<?> type, IntegerBounds bounds)
+    {   super(type, bounds);
+    }
+
+    private static final Identifier HEART_TEXTURE = Identifier.fromNamespaceAndPath(ColdSweat.MOD_ID, "textures/gui/overlay/hearts_frozen.png");
+    // Ticks up as hearts are rendered, representing the "index" of the current heart
+    private int heartIndex = 0;
+
+    @SubscribeEvent
+    public void onRenderHeart(RenderHeartEvent event)
+    {
+        LivingEntity player = ClientOnlyHelper.getClientPlayer();
+        if (!this.test(player)) return;
+        if (!ConfigSettings.SHOW_FROZEN_HEALTH.get()) return;
+
+        Gui.HeartType heartType = event.getHeartType();
+        boolean halfHeart = event.isHalfHeart();
+        int x = event.getX();
+        int y = event.getY();
+        // This check ensures that this only gets called once per heart
+        if (heartType == Gui.HeartType.CONTAINER)
+        {   heartIndex += 1;
+        }
+
+        double effect = this.getEffectFactor(player);
+        double heartsFreezePercentage = ConfigSettings.HEARTS_FREEZING_PERCENTAGE.get();
+        if (heartsFreezePercentage == 0) return;
+
+        float maxHealth = player.getMaxHealth();
+        boolean isHardcore = player.level().getLevelData().isHardcore();
+
+        float maxFrozenHealth = (float) (maxHealth * heartsFreezePercentage);
+        if (maxFrozenHealth == 0) return;
+
+        int frozenHealth = (int) Math.round(CSMath.blend(0, maxHealth * heartsFreezePercentage, effect, 0, 1));
+        int frozenHearts = Math.round(frozenHealth / 2f);
+        boolean partialFrozen = frozenHealth % 2 == 1 && heartIndex == frozenHearts;
+
+        // Render frozen hearts
+        if (heartIndex <= frozenHearts)
+        {
+            int u, v;
+            if (heartType == Gui.HeartType.CONTAINER)
+            {   u = 14;
+                v = partialFrozen ? 14 : 0;
+            }
+            else
+            {   u = isHardcore ? 7 : 0;
+                v = partialFrozen ? halfHeart ? 21 : 14 : halfHeart ? 7 : 0;
+            }
+            event.getGuiGraphics().blit(RenderPipelines.GUI_TEXTURED, HEART_TEXTURE, x + 1, y + 1, u, v, 7, 7, 21, 28);
+        }
+    }
+
+    @SubscribeEvent
+    public void resetHeartIndex(RenderFrameEvent.Pre event)
+    {   heartIndex = 0;
+    }
+
+    @Override
+    public Side getSide()
+    {   return Side.CLIENT;
+    }
+}

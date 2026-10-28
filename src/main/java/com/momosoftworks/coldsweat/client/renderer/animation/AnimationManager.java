@@ -1,0 +1,91 @@
+package com.momosoftworks.coldsweat.client.renderer.animation;
+
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.model.geom.ModelPart;
+import net.minecraft.client.model.geom.PartPose;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
+import com.momosoftworks.coldsweat.util.reflection.ReflectionHelper;
+
+import java.lang.reflect.Field;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.BiFunction;
+import java.util.stream.Collectors;
+
+public class AnimationManager
+{
+    static Field CHILDREN_FIELD = null;
+
+    public static Map<Entity, Float> ANIMATION_TIMERS = new ConcurrentHashMap<>();
+    static Map<Object, Map<String, PartPose>> DEFAULT_POSES = new ConcurrentHashMap<>();
+    static Map<Entity, Map<Object, Map<String, PartPose>>> ANIMATION_STATES = new ConcurrentHashMap<>();
+
+    static
+    {
+        try
+        {
+            CHILDREN_FIELD = ReflectionHelper.findField(ModelPart.class, "children");
+            CHILDREN_FIELD.setAccessible(true);
+        } catch (Exception ignored) {}
+    }
+
+    public static Map<String, ModelPart> getChildrenMap(ModelPart part)
+    {
+        try
+        {
+            Map<String, ModelPart> map = new ConcurrentHashMap<>((Map<String, ModelPart>) CHILDREN_FIELD.get(part));
+            for (ModelPart child : map.values())
+            {
+                map.putAll(getChildrenMap(child));
+            }
+            return map;
+        } catch (Exception ignored) {}
+        return Map.of();
+    }
+
+    /**
+     * @param modelKey The model the poses belong to (adult and baby models have different default poses)
+     */
+    public static void storeDefaultPoses(Object modelKey, Map<String, ModelPart> parts)
+    {
+        DEFAULT_POSES.put(modelKey, parts.entrySet().stream().map(partEntry -> Map.entry(partEntry.getKey(), partEntry.getValue().storePose())).collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)));
+    }
+
+    static Map<String, PartPose> loadDefaultPoses(Object modelKey, Map<String, ModelPart> parts)
+    {
+        Map<String, PartPose> defaultPoses = DEFAULT_POSES.get(modelKey);
+        if (defaultPoses != null)
+        {
+            defaultPoses.forEach((name, pose) -> parts.get(name).loadPose(pose));
+        }
+        return defaultPoses;
+    }
+
+    public static void saveAnimationStates(Entity entity, Object modelKey, Map<String, ModelPart> parts)
+    {
+        ANIMATION_STATES.computeIfAbsent(entity, e -> new ConcurrentHashMap<>()).put(modelKey, parts.entrySet().stream().map(partEntry -> Map.entry(partEntry.getKey(), partEntry.getValue().storePose())).collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)));
+    }
+
+    public static void loadAnimationStates(Entity entity, Object modelKey, Map<String, ModelPart> parts)
+    {
+        Map<String, PartPose> animationStates = ANIMATION_STATES.computeIfAbsent(entity, e -> new ConcurrentHashMap<>()).get(modelKey);
+        if (animationStates == null) animationStates = loadDefaultPoses(modelKey, parts);
+        if (animationStates == null) return;
+        animationStates.forEach((name, state) ->
+        {
+            ModelPart part = parts.get(name);
+            if (part != null)
+            {
+                part.loadPose(state);
+            }
+        });
+    }
+
+    public static void animateEntity(Entity entity, BiFunction<Float, Float, Float> animator)
+    {
+        float timer = ANIMATION_TIMERS.computeIfAbsent(entity, ent -> 0f);
+        ANIMATION_TIMERS.put(entity, animator.apply(timer, Minecraft.getInstance().getDeltaTracker().getGameTimeDeltaTicks() / 20));
+    }
+}

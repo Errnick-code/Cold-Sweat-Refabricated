@@ -1,0 +1,10 @@
+{
+  "replace": false,
+  "values": [
+    "#minecraft:is_drowned",
+    "#minecraft:is_deep_ocean",
+    "#minecraft:is_lush_caves",
+    "#minecraft:is_dripstone_caves",
+    "#minecraft:has_erosion"
+  ]
+}

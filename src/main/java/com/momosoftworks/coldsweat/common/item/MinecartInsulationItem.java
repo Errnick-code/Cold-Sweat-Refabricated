@@ -1,0 +1,53 @@
+package com.momosoftworks.coldsweat.common.item;
+
+import com.momosoftworks.coldsweat.core.init.ModBlocks;
+import com.momosoftworks.coldsweat.util.world.WorldHelper;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.projectile.ProjectileUtil;
+import net.minecraft.world.entity.vehicle.minecart.Minecart;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.*;
+
+public class MinecartInsulationItem extends Item
+{
+    public MinecartInsulationItem(Properties properties)
+    {
+        super(properties.stacksTo(1));
+    }
+
+    @Override
+    public InteractionResult use(Level level, Player player, InteractionHand hand)
+    {
+        ItemStack itemStack = player.getItemInHand(hand);
+        double reachDistance = player.getAttribute(Attributes.BLOCK_INTERACTION_RANGE).getValue();
+
+        Vec3 eye = player.getEyePosition();
+        Vec3 look = eye.add(player.getLookAngle().scale(reachDistance));
+        EntityHitResult entityHitResult = ProjectileUtil.getEntityHitResult(level, player, eye, look, (new AABB(eye, look)).inflate(1.0D), (entity) -> {
+            return entity instanceof Minecart;
+        }, 0.0F);
+        if (entityHitResult != null && entityHitResult.getType() == EntityHitResult.Type.ENTITY)
+        {
+            if (entityHitResult.getEntity() instanceof Minecart minecart && minecart.getDisplayBlockState().getBlock() != ModBlocks.MINECART_INSULATION.value())
+            {
+                if (!player.isCreative())
+                {   player.getMainHandItem().shrink(1);
+                }
+                player.swing(InteractionHand.MAIN_HAND, true);
+                WorldHelper.playEntitySound(SoundEvents.LLAMA_SWAG.value(), minecart, SoundSource.PLAYERS, 1f, (float) ((Math.random() / 5) + 0.9));
+                minecart.setCustomDisplayBlockState(java.util.Optional.of(ModBlocks.MINECART_INSULATION.value().defaultBlockState()));
+                minecart.setDisplayOffset(5);
+                return InteractionResult.SUCCESS;
+            }
+        }
+
+        return InteractionResult.PASS;
+    }
+}

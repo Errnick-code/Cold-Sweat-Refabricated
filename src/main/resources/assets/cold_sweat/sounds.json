@@ -1,0 +1,252 @@
+{
+  "entity.player.damage.freeze":
+  {
+    "subtitle": "entity.player.damage.freeze",
+    "sounds":
+    [
+      {
+        "name": "cold_sweat:player/damage/freeze_0"
+      },
+      {
+        "name": "cold_sweat:player/damage/freeze_1"
+      }
+    ]
+  },
+  "entity.chameleon.ambient":
+  {
+    "subtitle": "entity.chameleon.ambient",
+    "sounds":
+    [
+      {
+        "name": "cold_sweat:entity/chameleon/chameleon_ambient_0"
+      },
+      {
+        "name": "cold_sweat:entity/chameleon/chameleon_ambient_1"
+      },
+      {
+        "name": "cold_sweat:entity/chameleon/chameleon_ambient_2"
+      }
+    ]
+  },
+  "entity.chameleon.find":
+  {
+    "subtitle": "entity.chameleon.ambient",
+    "sounds":
+    [
+      {
+        "name": "cold_sweat:entity/chameleon/chameleon_find_0"
+      },
+      {
+        "name": "cold_sweat:entity/chameleon/chameleon_find_1"
+      },
+      {
+        "name": "cold_sweat:entity/chameleon/chameleon_find_2"
+      }
+    ]
+  },
+  "entity.chameleon.tongue.in":
+  {
+      "subtitle": "entity.chameleon.tongue",
+      "sounds":
+      [
+        {
+          "name": "cold_sweat:entity/chameleon/chameleon_tongue_in_0"
+        },
+        {
+          "name": "cold_sweat:entity/chameleon/chameleon_tongue_in_1"
+        }
+      ]
+  },
+  "entity.chameleon.tongue.out":
+  {
+    "subtitle": "entity.chameleon.tongue",
+    "sounds":
+    [
+      {
+        "name": "cold_sweat:entity/chameleon/chameleon_tongue_out_0"
+      },
+      {
+        "name": "cold_sweat:entity/chameleon/chameleon_tongue_out_1"
+      }
+    ]
+  },
+  "entity.chameleon.death":
+  {
+    "subtitle": "entity.chameleon.death",
+    "sounds":
+    [
+      {
+        "name": "cold_sweat:entity/chameleon/chameleon_death"
+      }
+    ]
+  },
+  "entity.chameleon.hurt":
+  {
+    "subtitle": "entity.chameleon.hurt",
+    "sounds":
+    [
+      {
+        "name": "cold_sweat:entity/chameleon/chameleon_hurt_0"
+      },
+      {
+        "name": "cold_sweat:entity/chameleon/chameleon_hurt_1"
+      },
+      {
+        "name": "cold_sweat:entity/chameleon/chameleon_hurt_2"
+      }
+    ]
+  },
+  "entity.chameleon.shed": {
+    "subtitle": "entity.chameleon.shed",
+    "sounds": [
+      {
+        "name": "cold_sweat:entity/chameleon/chameleon_shed"
+      }
+    ]
+  },
+  "entity.chameleon.shed.fail": {
+    "subtitle": "entity.chameleon.shed",
+    "sounds": [
+      {
+        "name": "cold_sweat:entity/chameleon/chameleon_shed_fail"
+      }
+    ]
+  },
+  "entity.chameleon.shed.ready": {
+    "subtitle": "entity.chameleon.shed.ready",
+    "sounds": [
+      {
+        "name": "cold_sweat:entity/chameleon/chameleon_shed_ready"
+      }
+    ]
+  },
+  "item.soulspring_lamp.on":
+  {
+    "subtitle": "item.soulspring_lamp.on",
+    "sounds":
+    [
+      {
+        "name": "cold_sweat:item/soulspring_lamp/soulspring_lamp_on"
+      }
+    ]
+  },
+  "item.soulspring_lamp.off":
+  {
+      "subtitle": "item.soulspring_lamp.off",
+    "sounds":
+    [
+      {
+        "name": "cold_sweat:item/soulspring_lamp/soulspring_lamp_off"
+      }
+    ]
+  },
+  "block.hearth.fuel_deplete":
+  {
+    "subtitle": "block.hearth.fuel_deplete",
+    "sounds":
+    [
+      {
+        "name": "cold_sweat:block/hearth/hearth_fuel_deplete"
+      }
+    ]
+  },
+  "block.boiler.fuel_deplete":
+  {
+    "subtitle": "block.boiler.fuel_deplete",
+    "sounds":
+    [
+      {
+        "name": "cold_sweat:block/hearth/hearth_fuel_deplete"
+      }
+    ]
+  },
+  "block.icebox.fuel_deplete":
+  {
+    "subtitle": "block.icebox.fuel_deplete",
+    "sounds":
+    [
+      {
+        "name": "cold_sweat:block/hearth/hearth_fuel_deplete"
+      }
+    ]
+  },
+  "item.waterskin.pour":
+  {
+    "subtitle": "item.waterskin.pour",
+    "sounds":
+    [
+      {
+        "name": "cold_sweat:item/waterskin/waterskin_pour"
+      }
+    ]
+  },
+  "item.waterskin.fill":
+  {
+    "subtitle": "item.waterskin.fill",
+    "sounds":
+    [
+      {
+        "name": "cold_sweat:item/waterskin/waterskin_fill"
+      }
+    ]
+  },
+  "block.icebox.open":
+  {
+    "subtitle": "block.icebox.open",
+    "sounds":
+    [
+      {
+        "name": "cold_sweat:block/icebox/icebox_open"
+      }
+    ]
+  },
+  "block.icebox.close":
+  {
+    "subtitle": "block.icebox.close",
+    "sounds":
+    [
+      {
+          "name": "cold_sweat:block/icebox/icebox_close"
+      }
+    ]
+  },
+  "item.armor.equip_chameleon_scale":
+  {
+    "subtitle": "item.armor.equip_chameleon",
+    "sounds":
+    [
+      {
+        "name": "cold_sweat:item/armor/chameleon_armor_equip_0"
+      },
+      {
+          "name": "cold_sweat:item/armor/chameleon_armor_equip_1"
+      },
+      {
+        "name": "cold_sweat:item/armor/chameleon_armor_equip_2"
+      }
+    ]
+  },
+  "item.bucket.fill_slush":
+  {
+    "subtitle": "subtitles.item.bucket.fill",
+    "sounds":
+    [
+      {
+        "name": "cold_sweat:item/bucket/slush_bucket_fill"
+      }
+    ]
+  },
+  "item.bucket.empty_slush":
+  {
+    "subtitle": "subtitles.item.bucket.empty",
+    "sounds":
+    [
+      {
+        "name": "cold_sweat:item/bucket/slush_bucket_empty_0"
+      },
+      {
+        "name": "cold_sweat:item/bucket/slush_bucket_empty_1"
+      }
+    ]
+  }
+}

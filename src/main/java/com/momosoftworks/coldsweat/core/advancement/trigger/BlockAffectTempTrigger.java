@@ -1,0 +1,47 @@
+package com.momosoftworks.coldsweat.core.advancement.trigger;
+
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.codecs.RecordCodecBuilder;
+import com.momosoftworks.coldsweat.api.util.Temperature;
+import net.minecraft.advancements.criterion.BlockPredicate;
+import net.minecraft.advancements.criterion.ContextAwarePredicate;
+import net.minecraft.advancements.criterion.MinMaxBounds;
+import net.minecraft.advancements.criterion.SimpleCriterionTrigger;
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerPlayer;
+
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
+public class BlockAffectTempTrigger extends SimpleCriterionTrigger<BlockAffectTempTrigger.Instance>
+{
+    @Override
+    public Codec<Instance> codec()
+    {   return Instance.CODEC;
+    }
+
+    public void trigger(ServerPlayer player, BlockPos pos, double distance, double totalEffect)
+    {   this.trigger(player, triggerInstance -> triggerInstance.matches(player, pos, distance, totalEffect));
+    }
+
+    public record Instance(Optional<ContextAwarePredicate> player, Optional<BlockPredicate> block, MinMaxBounds.Doubles distance, MinMaxBounds.Doubles totalEffect, List<TriggerHelper.TempCondition> conditions) implements SimpleInstance
+    {
+        public static final Codec<Instance> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+                ContextAwarePredicate.CODEC.optionalFieldOf("player").forGetter(Instance::player),
+                BlockPredicate.CODEC.optionalFieldOf("block").forGetter(Instance::block),
+                MinMaxBounds.Doubles.CODEC.optionalFieldOf("distance", MinMaxBounds.Doubles.ANY).forGetter(Instance::distance),
+                MinMaxBounds.Doubles.CODEC.optionalFieldOf("total_effect", MinMaxBounds.Doubles.ANY).forGetter(Instance::totalEffect),
+                Codec.list(TriggerHelper.TempCondition.CODEC).optionalFieldOf("player_temperature", List.of()).forGetter(Instance::conditions)
+        ).apply(instance, Instance::new));
+
+        public boolean matches(ServerPlayer player, BlockPos pos, double distance, double totalEffect)
+        {
+            Map<Temperature.Trait, Double> temps = Temperature.getTemperatures(player);
+            return this.distance.matches(distance)
+                    && this.totalEffect.matches(totalEffect)
+                    && this.block.map(b -> b.matches(((net.minecraft.server.level.ServerLevel) player.level()), pos)).orElse(true)
+                    && conditions.stream().allMatch(condition -> condition.matches(temps.getOrDefault(condition.trait(), 0.0)));
+        }
+    }
+}

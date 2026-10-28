@@ -1,0 +1,51 @@
+{
+  "parent": "cold_sweat:use_smokestack",
+  "display": {
+    "icon": {
+      "id": "cold_sweat:hearth"
+    },
+    "title": {
+        "translate": "advancements.cold_sweat.place_hearth.title"
+    },
+    "description": {
+        "translate": "advancements.cold_sweat.place_hearth.description"
+    },
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "has_warmth": {
+      "trigger": "minecraft:effects_changed",
+      "conditions": {
+        "effects": {
+          "cold_sweat:warmth": {}
+        }
+      }
+    },
+    "has_frigidness": {
+      "trigger": "minecraft:effects_changed",
+      "conditions": {
+        "effects": {
+          "cold_sweat:frigidness": {}
+        }
+      }
+    },
+    "placed_hearth": {
+      "trigger": "minecraft:placed_block",
+      "conditions": {
+        "location": [
+          {
+            "block": "cold_sweat:hearth_bottom",
+            "condition": "minecraft:block_state_property"
+          }
+        ]
+      }
+    }
+  },
+  "requirements": [
+    [ "placed_hearth" ],
+    [ "has_warmth", "has_frigidness" ]
+  ]
+}

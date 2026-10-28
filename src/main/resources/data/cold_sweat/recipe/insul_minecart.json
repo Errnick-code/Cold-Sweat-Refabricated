@@ -1,0 +1,16 @@
+{
+    "type":  "minecraft:crafting_shaped",
+    "pattern":  [
+                    "   ",
+                    " I ",
+                    " M "
+                ],
+    "key":  {
+                "I":  "cold_sweat:minecart_insulation",
+                "M":  "minecraft:minecart"
+            },
+    "result":  {
+                   "id":  "cold_sweat:insulated_minecart",
+                   "count":  1
+               }
+}

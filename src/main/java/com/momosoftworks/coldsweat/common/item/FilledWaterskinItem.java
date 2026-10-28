@@ -1,0 +1,446 @@
+package com.momosoftworks.coldsweat.common.item;
+
+import net.fabricmc.api.Environment;
+
+import net.fabricmc.api.EnvType;
+
+import com.momosoftworks.coldsweat.core.event.ModEvents;
+
+import com.momosoftworks.coldsweat.api.temperature.modifier.WaterTempModifier;
+import com.momosoftworks.coldsweat.api.temperature.modifier.WaterskinTempModifier;
+import com.momosoftworks.coldsweat.api.util.placement.Matcher;
+import com.momosoftworks.coldsweat.api.util.Temperature;
+import com.momosoftworks.coldsweat.api.util.placement.Mode;
+import com.momosoftworks.coldsweat.api.util.placement.Order;
+import com.momosoftworks.coldsweat.api.util.placement.Placement;
+import com.momosoftworks.coldsweat.common.capability.handler.EntityTempManager;
+import com.momosoftworks.coldsweat.compat.CompatManager;
+import com.momosoftworks.coldsweat.common.entity.data.Preference;
+import com.momosoftworks.coldsweat.client.event.TooltipHandler;
+import com.momosoftworks.coldsweat.util.ClientOnlyHelper;
+import com.momosoftworks.coldsweat.config.ConfigSettings;
+import com.momosoftworks.coldsweat.core.event.TaskScheduler;
+import com.momosoftworks.coldsweat.core.init.ModItemComponents;
+import com.momosoftworks.coldsweat.core.init.ModItems;
+import com.momosoftworks.coldsweat.core.init.ModSounds;
+import com.momosoftworks.coldsweat.core.network.message.ParticleBatchMessage;
+import com.momosoftworks.coldsweat.util.entity.EntityHelper;
+import com.momosoftworks.coldsweat.util.math.CSMath;
+import com.momosoftworks.coldsweat.util.world.WorldHelper;
+import net.minecraft.ChatFormatting;
+import net.minecraft.client.Minecraft;
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.item.component.TooltipDisplay;
+import java.util.function.Consumer;
+import net.minecraft.core.Direction;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.core.dispenser.DispenseItemBehavior;
+import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.network.chat.Style;
+import net.minecraft.sounds.SoundSource;
+import net.minecraft.util.Mth;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.*;
+import net.minecraft.world.item.component.UseRemainder;
+import net.minecraft.world.item.context.UseOnContext;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.DispenserBlock;
+import net.minecraft.world.level.block.LayeredCauldronBlock;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.chunk.ChunkAccess;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
+import com.momosoftworks.coldsweat.core.event.SubscribeEvent;
+import com.momosoftworks.coldsweat.core.event.compat.LivingEntityUseItemEvent;
+import com.momosoftworks.coldsweat.core.event.compat.LevelTickEvent;
+
+import java.util.*;
+import javax.annotation.Nullable;
+
+public class FilledWaterskinItem extends Item
+{
+    public static final double DRAIN_RATE = 0.5;
+
+    public FilledWaterskinItem(Properties properties)
+    {
+        super(properties.stacksTo(1).craftRemainder(ModItems.WATERSKIN.get())
+                              .component(ModItemComponents.WATER_TEMPERATURE, 0d));
+
+        DispenserBlock.registerBehavior(this, DISPENSE_BEHAVIOR);
+    }
+
+    public static ItemStack getDisplayStack()
+    {   return new ItemStack(ModItems.FILLED_WATERSKIN.value());
+    }
+
+    @Override
+    public int getBarColor(ItemStack stack)
+    {   return 0x2D5EDE;
+    }
+
+    @Override
+    public boolean isBarVisible(ItemStack stack)
+    {   return stack.getDamageValue() > 0;
+    }
+
+    public static int getMaxUses(ItemStack stack)
+    {
+        int maxDamage = stack.getMaxDamage();
+        return maxDamage > 0 ? maxDamage : Math.max(1, ConfigSettings.WATERSKIN_USES.get());
+    }
+
+    private static int getDurability(ItemStack stack)
+    {   return Math.max(0, getMaxUses(stack) - stack.getDamageValue());
+    }
+
+    @Override
+    public void inventoryTick(ItemStack stack, ServerLevel world, Entity entity, @Nullable EquipmentSlot slot)
+    {
+        super.inventoryTick(stack, world, entity, slot);
+        int inventorySlot = EntityHelper.getInventorySlot(entity, stack);
+        if (!world.isClientSide() && EntityTempManager.isTemperatureEnabled(entity) && entity.tickCount % 5 == 0)
+        {
+            double itemTemp = stack.get(ModItemComponents.WATER_TEMPERATURE);
+            boolean shouldDrain = ConfigSettings.ITEM_TEMPERATURES.get().get(stack.getItem())
+                                  .stream().anyMatch(c -> c.test(entity, stack, inventorySlot, null));
+            if (shouldDrain)
+            {
+                double drainAmt = (DRAIN_RATE / 20) * ConfigSettings.WATERSKIN_NEUTRALIZE_SPEED.get() * 4;
+                double newTemp = CSMath.shrink(itemTemp, drainAmt);
+                stack.set(ModItemComponents.WATER_TEMPERATURE, newTemp);
+            }
+        }
+    }
+
+    public static boolean performPourAction(ItemStack stack, LivingEntity entity, InteractionHand hand)
+    {
+        if (!(entity instanceof Player player && stack.is(ModItems.FILLED_WATERSKIN.value()) && stack.has(ModItemComponents.WATER_TEMPERATURE))) return false;
+
+        // Play empty sound
+        if (!player.level().isClientSide())
+        {
+            double temperature = stack.getOrDefault(ModItemComponents.WATER_TEMPERATURE, 0d);
+            double wetnessTemp = 0.05 * CSMath.sign(temperature == 0 ? 1 : temperature);
+            // Replace or add water temp modifier
+            Placement modPlacement = Placement.of(Mode.REPLACE, Order.FIRST, mod -> mod instanceof WaterTempModifier).orElse(Placement.LAST);
+            Temperature.addModifier(player, new WaterTempModifier(wetnessTemp).tickRate(5), Temperature.Trait.WORLD, modPlacement);
+
+            WorldHelper.playEntitySound(ModSounds.WATERSKIN_POUR.value(), player, player.getSoundSource(), 2f, (float) ((Math.random() / 5) + 0.9));
+        }
+
+        consumeWaterskin(stack, player, hand);
+        ModEvents.post(new LivingEntityUseItemEvent.Finish(player, stack, 1));
+        player.swing(hand, true);
+
+        // spawn falling water particles
+        Random rand = new Random();
+        for (int i = 0; i < 6; i++)
+        {
+            TaskScheduler.scheduleServer(() ->
+            {
+                ParticleBatchMessage particleBatch = new ParticleBatchMessage(2);
+                for (int p = 0; p < 10; p++)
+                {
+                    AABB playerBB = player.getDimensions(player.getPose()).makeBoundingBox(player.position()).inflate(0.2);
+                    particleBatch.addParticle(ParticleTypes.FALLING_WATER,
+                                              Mth.lerp(rand.nextFloat(), playerBB.minX, playerBB.maxX),
+                                              playerBB.maxY,
+                                              Mth.lerp(rand.nextFloat(), playerBB.minZ, playerBB.maxZ),
+                                              0.3, 0.3, 0.3);
+                }
+                particleBatch.sendEntity(player);
+            }, i);
+        }
+        player.getCooldowns().addCooldown(ModItems.FILLED_WATERSKIN.value().getDefaultInstance(), 10);
+        player.getCooldowns().addCooldown(ModItems.WATERSKIN.value().getDefaultInstance(), 10);
+
+        return true;
+    }
+
+    public static ItemStack consumeWaterskin(ItemStack stack, LivingEntity entity, InteractionHand usedHand)
+    {
+        // Create empty waterskin item
+        ItemStack emptyStack = getEmptyWaterskin(stack);
+
+        // Add the item to the player's inventory
+        if (entity instanceof Player player && player.getInventory().contains(emptyStack))
+        {   player.addItem(emptyStack);
+            player.setItemInHand(usedHand, ItemStack.EMPTY);
+            return ItemStack.EMPTY;
+        }
+        else
+        {   entity.setItemInHand(usedHand, emptyStack);
+            return emptyStack;
+        }
+    }
+
+    @Override
+    public InteractionResult use(Level level, Player player, InteractionHand hand)
+    {
+        if (player.isCrouching())
+        {   return performAction(Preference.getOrDefault(player, Preference.WATERSKIN_SECONDARY, Preference.WaterskinAction.DRINK), level, player, hand);
+        }
+        else
+        {   return performAction(Preference.getOrDefault(player, Preference.WATERSKIN_PRIMARY, Preference.WaterskinAction.POUR), level, player, hand);
+        }
+    }
+
+    @Override
+    public void onUseTick(Level level, LivingEntity entity, ItemStack stack, int remainingTicks)
+    {
+        super.onUseTick(level, entity, stack, remainingTicks);
+        if (remainingTicks % 5 == 0 && remainingTicks < this.getUseDuration(stack, entity) - 5)
+        {
+            Vec3 playerPos = entity.position().add(0, entity.getBbHeight() / 2, 0);
+            Vec3 lookVec = new Vec3(entity.getLookAngle().x, 0, entity.getLookAngle().z).normalize();
+            Vec3 particlePos = playerPos.add(lookVec.scale(0.3));
+            WorldHelper.spawnParticleBatch(level, ParticleTypes.SPLASH, particlePos.x, particlePos.y, particlePos.z, 0.2, 0.2, 0.2, 4, 0);
+        }
+    }
+
+    private static InteractionResult performAction(Preference.WaterskinAction action, Level level, Player player, InteractionHand hand)
+    {
+        ItemStack stack = player.getItemInHand(hand);
+        switch (action)
+        {
+            case DRINK ->
+            {   startUsingInstantly(player, hand);
+                return InteractionResult.SUCCESS;
+            }
+            case POUR ->
+            {   if (performPourAction(stack, player, hand))
+                {   return InteractionResult.CONSUME;
+                }
+            }
+            case NONE -> {}
+        }
+        return InteractionResult.PASS;
+    }
+
+    private static void startUsingInstantly(Player player, InteractionHand hand)
+    {
+        player.startUsingItem(hand);
+    }
+
+    @Override
+    public InteractionResult useOn(UseOnContext context)
+    {
+        Level level = context.getLevel();
+        BlockPos pos = context.getClickedPos();
+        BlockState state = level.getBlockState(pos);
+        Player player = context.getPlayer();
+
+        if (state.is(Blocks.CAULDRON) || state.is(Blocks.WATER_CAULDRON))
+        {
+            boolean hasWater = state.is(Blocks.WATER_CAULDRON);
+            // Fill cauldron
+            int waterLevel = hasWater ? state.getValue(LayeredCauldronBlock.LEVEL) : 0;
+            if (waterLevel >= 3) return InteractionResult.PASS;
+            state = hasWater
+                    ? state.setValue(LayeredCauldronBlock.LEVEL, waterLevel + 1)
+                    : Blocks.WATER_CAULDRON.defaultBlockState().setValue(LayeredCauldronBlock.LEVEL, 1);
+            level.setBlock(pos, state, 3);
+            // Pouring sound / visuals
+            if (!level.isClientSide())
+            {   level.playSound(null, pos, ModSounds.WATERSKIN_FILL.value(), SoundSource.BLOCKS, 2f, (float) Math.random() / 5 + 0.9f);
+                WorldHelper.spawnParticleBatch(level, ParticleTypes.SPLASH, pos.getX() + 0.5, pos.getY() + 0.65, pos.getZ() + 0.5, 0.5, 0.5, 0.5, 10, 0);
+            }
+            // Consume waterskin
+            if (player != null)
+            {   consumeWaterskin(context.getItemInHand(), player, context.getHand());
+                player.getCooldowns().addCooldown(ModItems.WATERSKIN.value().getDefaultInstance(), 10);
+            }
+            return InteractionResult.SUCCESS;
+        }
+        return InteractionResult.PASS;
+    }
+
+    @Override
+    public ItemUseAnimation getUseAnimation(ItemStack stack)
+    {   return ItemUseAnimation.DRINK;
+    }
+
+    @Override
+    public int getUseDuration(ItemStack stack, LivingEntity entity)
+    {   return 32;
+    }
+
+    @Override
+    public ItemStack finishUsingItem(ItemStack stack, Level level, LivingEntity entity)
+    {
+        int maxUses = Math.max(1, ConfigSettings.WATERSKIN_USES.get());
+        if (stack.getMaxDamage() != maxUses)
+        {   stack.set(DataComponents.MAX_DAMAGE, maxUses);
+        }
+        double amount = stack.get(ModItemComponents.WATER_TEMPERATURE) * (ConfigSettings.WATERSKIN_CONSUME_STRENGTH.get() / 50d);
+        Temperature.addModifier(entity, new WaterskinTempModifier(amount / (100 * maxUses)).expires(100), Temperature.Trait.CORE, Placement.LAST);
+        if (entity instanceof Player player && player.isCreative())
+        {   return stack;
+        }
+        else
+        {
+            if (getDurability(stack) <= 1)
+            {   return consumeWaterskin(stack, entity, entity.getUsedItemHand());
+            }
+            else
+            {   stack.setDamageValue(stack.getDamageValue() + 1);
+                return stack;
+            }
+        }
+    }
+
+    @Override
+    @Environment(EnvType.CLIENT)
+    public void appendHoverText(ItemStack stack, TooltipContext context, TooltipDisplay display, Consumer<Component> tooltip, TooltipFlag advanced)
+    {
+        MutableComponent filledLabel = Component.translatable("item.cold_sweat.waterskin.filled").withStyle(ChatFormatting.GRAY);
+        if (ConfigSettings.ENABLE_HINTS.get() && !TooltipHandler.isShiftDown())
+        {   filledLabel.append(Component.literal(" ").append(TooltipHandler.EXPAND_TOOLTIP_HINT));
+        }
+        tooltip.accept(filledLabel);
+
+        if (TooltipHandler.isShiftDown() && ConfigSettings.ENABLE_HINTS.get())
+        {
+            String crouchKey = Minecraft.getInstance().options.keyShift.getTranslatedKeyMessage().getString();
+            String crouchAction;
+            switch (Preference.getOrDefault(ClientOnlyHelper.getClientPlayer(), Preference.WATERSKIN_SECONDARY, Preference.WaterskinAction.POUR))
+            {
+                case DRINK -> crouchAction = "tooltip.cold_sweat.waterskin.drink";
+                case POUR -> crouchAction = "tooltip.cold_sweat.waterskin.pour";
+                default -> crouchAction = "";
+            }
+            if (!crouchAction.isEmpty())
+            {   tooltip.accept(Component.translatable(crouchAction, Component.literal(crouchKey).withStyle(ChatFormatting.GRAY)).withStyle(ChatFormatting.DARK_GRAY));
+            }
+        }
+
+        super.appendHoverText(stack, context, display, tooltip, advanced);
+    }
+
+    public static ItemStack getEmptyWaterskin(ItemStack stack)
+    {
+        if (!(stack.getItem() instanceof FilledWaterskinItem))
+        {   return stack;
+        }
+        UseRemainder useRemainder = stack.get(DataComponents.USE_REMAINDER);
+        if (useRemainder == null)
+        {   return stack;
+        }
+        ItemStack emptyWaterskin = useRemainder.convertInto().create();
+
+        emptyWaterskin.applyComponents(stack.getComponentsPatch());
+        emptyWaterskin.remove(ModItemComponents.WATER_TEMPERATURE);
+        emptyWaterskin.remove(DataComponents.DAMAGE);
+        emptyWaterskin.remove(DataComponents.MAX_DAMAGE);
+        emptyWaterskin.set(DataComponents.MAX_STACK_SIZE, emptyWaterskin.getItem().getDefaultMaxStackSize());
+        if (CompatManager.isThirstLoaded())
+        {   CompatManager.Thirst.setPurity(emptyWaterskin, 0);
+        }
+        return emptyWaterskin;
+    }
+
+    @Override
+    public Component getName(ItemStack stack)
+    {   return Component.translatable("item.cold_sweat.waterskin");
+    }
+
+    private static final DispenseItemBehavior DISPENSE_BEHAVIOR = (source, stack) ->
+    {
+        BlockPos pos = source.pos().relative(source.state().getValue(DispenserBlock.FACING));
+        Level level = source.level();
+        ChunkAccess chunk = WorldHelper.getChunk(level, pos);
+        double itemTemp = stack.getOrDefault(ModItemComponents.WATER_TEMPERATURE, 0d);
+
+        if (chunk == null) return stack;
+
+        // Play sound
+        level.playSound(null, pos.getX(), pos.getY(), pos.getZ(), ModSounds.WATERSKIN_POUR.value(),
+                SoundSource.BLOCKS, 1, (float) ((Math.random() / 5) + 0.9));
+
+        // Spawn particles
+        Random rand = new Random();
+        for (int i = 0; i < 6; i++)
+        {
+            TaskScheduler.scheduleServer(() ->
+            {
+                ParticleBatchMessage particles = new ParticleBatchMessage(2);
+                for (int p = 0; p < rand.nextInt(5) + 5; p++)
+                {
+                    particles.addParticle(ParticleTypes.FALLING_WATER,
+                            new ParticleBatchMessage.ParticlePlacement(pos.getX() + rand.nextDouble(),
+                                                                       pos.getY() + rand.nextDouble(),
+                                                                       pos.getZ() + rand.nextDouble(), 0, 0, 0));
+                }
+                particles.sendWorld(level);
+            }, i);
+        }
+
+        // Spawn a hitbox that falls at the same rate as the particles and gives players below the waterskin effect
+        new Object()
+        {
+            double acceleration = 0;
+            int tick = 0;
+            AABB aabb = new AABB(pos).inflate(0.5);
+            // Track affected players to prevent duplicate effects
+            Set<Player> affectedPlayers = new HashSet<>();
+
+            void start()
+            {   ModEvents.register(this);
+            }
+
+            @SubscribeEvent
+            public void onTick(LevelTickEvent.Pre event)
+            {
+                if (event.getLevel().isClientSide() == level.isClientSide())
+                {
+                    // Temperature of waterskin weakens over time
+                    double waterTemp = CSMath.blend(itemTemp, itemTemp / 5, tick, 20, 100);
+                    double effectAmount = waterTemp * (ConfigSettings.WATERSKIN_CONSUME_STRENGTH.get() / 50d);
+                    double wetnessTemp = 0.05 * CSMath.sign(waterTemp+0.01);
+
+                    // Move the box down at the speed of gravity
+                    aabb = aabb.move(0, -acceleration, 0);
+
+                    // If there's ground, stop
+                    BlockPos pos = BlockPos.containing(aabb.minX, aabb.minY, aabb.minZ);
+                    if (WorldHelper.isFullSide(chunk.getBlockState(pos).getShape(level, pos), Direction.UP))
+                    {   ModEvents.unregister(this);
+                        return;
+                    }
+
+                    // Apply the waterskin modifier to all entities in the box
+                    WorldHelper.getEntitiesOfClass(Player.class, level, aabb, e -> true).forEach(player ->
+                    {
+                        if (!affectedPlayers.contains(player))
+                        {   // Apply the effect and store the player
+                            Temperature.addModifier(player, new WaterskinTempModifier(effectAmount).expires(0), Temperature.Trait.CORE, Placement.LAST);
+                            Temperature.replaceOrAddModifier(player, new WaterTempModifier(wetnessTemp).tickRate(5), Temperature.Trait.WORLD, Matcher.SAME_CLASS);
+                            affectedPlayers.add(player);
+                        }
+                    });
+
+                    // Increase the speed of the box
+                    acceleration += 0.0052;
+                    tick++;
+
+                    // Expire after 5 seconds
+                    if (tick > 100)
+                    {   ModEvents.unregister(this);
+                    }
+                }
+            }
+        }.start();
+
+        return getEmptyWaterskin(stack);
+    };
+}

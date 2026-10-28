@@ -1,0 +1,133 @@
+package com.momosoftworks.coldsweat.util.item;
+
+import com.mojang.serialization.DynamicOps;
+import com.momosoftworks.coldsweat.util.serialization.RegistryHelper;
+import it.unimi.dsi.fastutil.objects.Object2IntMap;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
+import net.minecraft.core.RegistryAccess;
+import net.minecraft.core.component.DataComponentPatch;
+import net.minecraft.core.component.DataComponentType;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.NbtOps;
+import net.minecraft.nbt.Tag;
+import net.minecraft.resources.RegistryOps;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.ai.attributes.AttributeModifier;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.BucketItem;
+import net.minecraft.world.item.equipment.Equippable;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.component.ItemAttributeModifiers;
+import net.minecraft.world.item.enchantment.Enchantment;
+import net.minecraft.world.level.LevelAccessor;
+import com.momosoftworks.coldsweat.util.reflection.ReflectionHelper;
+
+import javax.annotation.Nullable;
+import java.lang.reflect.Method;
+import java.util.Optional;
+import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.Supplier;
+import java.util.stream.Stream;
+
+public class ItemStackHelper
+{
+    public static void playBucketEmptySound(ItemStack stack, @Nullable Player pPlayer, LevelAccessor pLevel, BlockPos pPos)
+    {
+        Method playEmptySound = ReflectionHelper.findMethod(BucketItem.class, "playEmptySound", Player.class, LevelAccessor.class, BlockPos.class);
+        playEmptySound.setAccessible(true);
+        try
+        {   playEmptySound.invoke(stack.getItem(), pPlayer, pLevel, pPos);
+        }
+        catch (Exception e)
+        {   e.printStackTrace();
+        }
+    }
+
+    public static Stream<ItemAttributeModifiers.Entry> getAttributeModifiers(ItemStack stack, AttributeModifier.Operation operation)
+    {   net.minecraft.world.item.component.ItemAttributeModifiers modifiers = stack.get(DataComponents.ATTRIBUTE_MODIFIERS);
+        if (modifiers == null) return Stream.empty();
+        return modifiers.modifiers().stream().filter(entry -> entry.modifier().operation() == operation);
+    }
+
+    public static Stream<ItemAttributeModifiers.Entry> getAttributeModifiers(ItemStack stack, EquipmentSlot slot)
+    {   net.minecraft.world.item.component.ItemAttributeModifiers modifiers = stack.get(DataComponents.ATTRIBUTE_MODIFIERS);
+        if (modifiers == null) return Stream.empty();
+        return modifiers.modifiers().stream().filter(entry -> entry.slot().test(slot));
+    }
+
+    public static <T> T getOrCreateComponent(ItemStack stack, DataComponentType<T> componentType, Supplier<T> componentCreator)
+    {
+        T component = stack.get(componentType);
+        if (component == null)
+        {
+            component = componentCreator.get();
+            stack.set(componentType, component);
+        }
+        return component;
+    }
+
+    public static CompoundTag serializeComponentsUnsafe(ItemStack stack)
+    {
+        RegistryAccess registryAccess = RegistryHelper.getRegistryAccess();
+        if (registryAccess == null) return new CompoundTag();
+        DynamicOps<Tag> ops = RegistryOps.create(NbtOps.INSTANCE, RegistryHelper.getRegistryAccess());
+        return (CompoundTag) DataComponentPatch.CODEC.encodeStart(ops, stack.getComponentsPatch()).result().orElse(new CompoundTag());
+    }
+
+    /**
+     * Executes the given action on the component acquired from the item, if it has it, then writes the modified component back to the item.
+     * @return The modified component
+     */
+    public static <T> T ifPresent(ItemStack stack, DataComponentType<T> componentType, Function<T, T> action)
+    {
+        T component = stack.get(componentType);
+        if (component != null)
+        {   component = action.apply(component);
+            stack.set(componentType, component);
+        }
+        return component;
+    }
+    public static <T> T ifPresent(ItemStack stack, Supplier<DataComponentType<T>> componentType, Function<T, T> action)
+    {   return ifPresent(stack, componentType.get(), action);
+    }
+
+    public static <T> Optional<T> getOpt(ItemStack stack, DataComponentType<T> componentType)
+    {   return Optional.ofNullable(stack.get(componentType));
+    }
+    public static <T> Optional<T> getOpt(ItemStack stack, Supplier<DataComponentType<T>> componentType)
+    {   return getOpt(stack, componentType.get());
+    }
+
+    public static EquipmentSlot getEquipmentSlot(ItemStack stack)
+    {
+        
+        // Item is equippable
+        net.minecraft.world.item.equipment.Equippable equipable = stack.get(DataComponents.EQUIPPABLE);
+        if (equipable != null)
+        {   return equipable.slot();
+        }
+
+        return EquipmentSlot.MAINHAND;
+    }
+
+    public static boolean canApplyEnchantment(ItemStack item, Holder<Enchantment> enchantment)
+    {
+        if (item.has(DataComponents.ENCHANTMENTS))
+        {
+            for (Object2IntMap.Entry<Holder<Enchantment>> entry : item.get(DataComponents.ENCHANTMENTS).entrySet())
+            {
+                Holder<Enchantment> itemEnch = entry.getKey();
+
+                if (itemEnch.value().exclusiveSet().contains(enchantment)
+                || enchantment.value().exclusiveSet().contains(itemEnch))
+                {   return false;
+                }
+            }
+            return true;
+        }
+        else return false;
+    }
+}

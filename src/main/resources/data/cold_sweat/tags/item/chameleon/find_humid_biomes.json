@@ -1,0 +1,9 @@
+{
+  "replace": false,
+  "values": [
+    "minecraft:slime_ball",
+    "minecraft:fern",
+    "minecraft:large_fern",
+    "minecraft:cocoa_beans"
+  ]
+}

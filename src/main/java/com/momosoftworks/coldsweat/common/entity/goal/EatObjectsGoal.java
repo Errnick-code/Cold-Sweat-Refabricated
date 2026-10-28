@@ -1,0 +1,190 @@
+package com.momosoftworks.coldsweat.common.entity.goal;
+
+import com.momosoftworks.coldsweat.common.data.PersistentData;
+
+import com.momosoftworks.coldsweat.common.entity.Chameleon;
+import com.momosoftworks.coldsweat.common.entity.data.edible.ChameleonEdibles;
+import com.momosoftworks.coldsweat.common.entity.data.edible.Edible;
+import com.momosoftworks.coldsweat.core.event.TaskScheduler;
+import com.momosoftworks.coldsweat.core.init.ModSounds;
+import com.momosoftworks.coldsweat.util.world.WorldHelper;
+import net.minecraft.tags.TagKey;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.ai.goal.*;
+import net.minecraft.world.entity.ai.navigation.PathNavigation;
+import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.pathfinder.Path;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
+
+import java.util.List;
+import java.util.Optional;
+
+public class EatObjectsGoal extends Goal
+{
+    TagKey<EntityType<?>> wantedEntities;
+    Chameleon entity;
+    Entity target;
+    boolean stoppedTasks;
+    Vec3 lookPos = null;
+
+    public EatObjectsGoal(Chameleon chameleon, TagKey<EntityType<?>> wantedEntities)
+    {
+        this.wantedEntities = wantedEntities;
+        this.entity = chameleon;
+    }
+
+    public boolean canContinueToUse()
+    {
+        return (this.target != null && this.target.isAlive() && !this.target.isRemoved()) || this.entity.getEatTimer() > 0;
+    }
+
+    public boolean isInterruptable()
+    {
+        return false;
+    }
+
+    public void start()
+    {
+        // Scan for ItemEntity in a 5-block range
+        List<Entity> items = WorldHelper.getEntities(this.entity.level(), new AABB(this.entity.blockPosition()).inflate(5), e -> true);
+        for (Entity ent : items)
+        {
+            if (ent instanceof ItemEntity itemEntity && itemEntity.getOwner() != null
+            && (this.entity.isPlayerTrusted(itemEntity.getOwner().getUUID()) || this.entity.isTamingItem(itemEntity.getItem())))
+            {
+                ItemStack item = itemEntity.getItem();
+                Optional<Edible> edible = ChameleonEdibles.getEdible(item);
+                if (edible.isPresent()
+                && (!PersistentData.get(itemEntity).contains("Recipient") || PersistentData.getUUID(PersistentData.get(itemEntity), "Recipient").equals(this.entity.getUUID())))
+                {
+                    if (this.entity.getCooldown(edible.get()) <= 0 && edible.get().shouldEat(item, this.entity, itemEntity.getOwner())
+                    || isBreedingItem(itemEntity.getItem()))
+                    {
+                        this.target = ent;
+                        this.lookPos = ent.position();
+                        break;
+                    }
+                }
+            }
+            else if (ent.getType().builtInRegistryHolder().is(this.wantedEntities))
+            {
+                this.target = ent;
+                this.lookPos = ent.position();
+                break;
+            }
+        }
+    }
+
+    public void stop()
+    {
+        this.stoppedTasks = false;
+        this.target = null;
+    }
+
+    public boolean requiresUpdateEveryTick()
+    {
+        return true;
+    }
+
+    public void tick()
+    {
+        if ((this.target == null || this.target.isRemoved()) && this.entity.getEatTimer() <= 0)
+        {
+            this.stop();
+            return;
+        }
+
+        // Look at target position
+        this.lookPos = this.target.position().add(this.target.getDeltaMovement());
+        this.entity.getLookControl().setLookAt(lookPos);
+
+        if (this.entity.getEatTimer() <= 0)
+        {
+            // Move to the target
+            PathNavigation navigator = this.entity.getNavigation();
+            Path path = navigator.createPath(target, 0);
+            if (path != null) navigator.moveTo(path, 1.5);
+
+            // Update look position
+
+            // If within 1.5 blocks, eat the item
+            if (Math.sqrt(this.entity.distanceToSqr(this.target)) < 1.5 && Math.abs(this.entity.getY() - this.target.getY()) < 1 && this.target.isAlive())
+            {
+                navigator.stop();
+                this.entity.getLookControl().setLookAt(lookPos);
+
+                // Play tongue stretch animation
+                this.entity.eatAnimation();
+
+                // Play tongue out sound
+                WorldHelper.playEntitySound(ModSounds.CHAMELEON_TONGUE_OUT.value(), this.entity, this.entity.getSoundSource(), 1, (float) Math.random() * 0.2f + 0.9f);
+
+                // Remove target item
+                TaskScheduler.scheduleServer(() ->
+                {
+                    if (this.target != null && this.target.isAlive() && !this.target.isRemoved())
+                    {
+                        this.entity.onEatEntity(this.target);
+                        this.target.remove(Entity.RemovalReason.KILLED);
+
+                        if (this.target instanceof ItemEntity item)
+                        {   this.entity.onItemPickup(item);
+
+                            Entity thrower = item.getOwner();
+                            if (thrower != null)
+                            {
+                                if (item.getItem().getCount() > 0)
+                                {   ItemStack stack = item.getItem().copy();
+                                    stack.shrink(1);
+                                    if (!stack.isEmpty())
+                                    {   ItemEntity remainingStack = WorldHelper.entityDropItem(this.entity, stack);
+                                        remainingStack.setThrower(thrower);
+                                        PersistentData.putUUID(PersistentData.get(remainingStack), "Recipient", this.entity.getUUID());
+                                    }
+                                }
+                            }
+                        }
+
+                        // Play tongue in sound
+                        WorldHelper.playEntitySound(ModSounds.CHAMELEON_TONGUE_IN.value(), this.entity, this.entity.getSoundSource(), 1, (float) Math.random() * 0.2f + 0.9f);
+                    }
+                }, this.entity.getEatAnimLength() / 2 + 2);
+
+                // Send the entity toward the chameleon
+                TaskScheduler.scheduleServer(() ->
+                {
+                    this.target.setDeltaMovement(this.entity.position().subtract(this.target.position()).normalize().scale(0.75));
+                }, this.entity.getEatAnimLength() / 2);
+            }
+
+            for (WrappedGoal goal : com.momosoftworks.coldsweat.util.entity.EntityHelper.getGoalSelector(this.entity).getAvailableGoals())
+            {
+                Goal g = goal.getGoal();
+                if (g instanceof TemptGoal || g instanceof LookAtPlayerGoal || g instanceof RandomLookAroundGoal || g instanceof LazyLookGoal)
+                {
+                    if (g.isInterruptable())
+                    {
+                        this.stoppedTasks = true;
+                        goal.stop();
+                    }
+                    else
+                    {   stoppedTasks = false;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    @Override
+    public boolean canUse()
+    {   return this.entity.getLastHurtByMob() == null;
+    }
+
+    private boolean isBreedingItem(ItemStack stack)
+    {   return this.entity.canFallInLove() && this.entity.isFood(stack);
+    }
+}

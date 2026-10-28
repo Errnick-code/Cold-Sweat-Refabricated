@@ -1,0 +1,14 @@
+{
+  "layers": {
+    "humanoid": [
+      {
+        "texture": "cold_sweat:empty"
+      }
+    ],
+    "humanoid_leggings": [
+      {
+        "texture": "cold_sweat:empty"
+      }
+    ]
+  }
+}

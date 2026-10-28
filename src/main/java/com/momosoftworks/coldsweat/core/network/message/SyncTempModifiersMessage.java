@@ -1,0 +1,65 @@
+package com.momosoftworks.coldsweat.core.network.message;
+import net.minecraft.world.entity.Entity;
+import com.momosoftworks.coldsweat.common.capability.handler.EntityTempManager;
+import com.momosoftworks.coldsweat.util.ClientOnlyHelper;
+import com.momosoftworks.coldsweat.core.network.CSNetContext;
+
+import com.momosoftworks.coldsweat.ColdSweat;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.entity.LivingEntity;
+
+public class SyncTempModifiersMessage implements CustomPacketPayload
+{
+    public static final CustomPacketPayload.Type<SyncTempModifiersMessage> TYPE = new CustomPacketPayload.Type<>(Identifier.fromNamespaceAndPath(ColdSweat.MOD_ID, "sync_temp_modifiers"));
+    public static final StreamCodec<FriendlyByteBuf, SyncTempModifiersMessage> CODEC = CustomPacketPayload.codec(SyncTempModifiersMessage::encode, SyncTempModifiersMessage::decode);
+
+    int entityId;
+    CompoundTag modifiers;
+
+    public SyncTempModifiersMessage(LivingEntity entity, CompoundTag modifiers)
+    {
+        this.entityId = entity.getId();
+        this.modifiers = modifiers;
+    }
+
+    SyncTempModifiersMessage(int entityId, CompoundTag modifiers)
+    {
+        this.entityId = entityId;
+        this.modifiers = modifiers;
+    }
+
+    public static void encode(SyncTempModifiersMessage message, FriendlyByteBuf buffer)
+    {
+        buffer.writeInt(message.entityId);
+        buffer.writeNbt(message.modifiers);
+    }
+
+    public static SyncTempModifiersMessage decode(FriendlyByteBuf buffer)
+    {
+        return new SyncTempModifiersMessage(buffer.readInt(), buffer.readNbt());
+    }
+
+    public static void handle(SyncTempModifiersMessage message, CSNetContext context)
+    {
+        context.enqueueWork(() ->
+        {
+            Entity entity = ClientOnlyHelper.getClientLevel().getEntity(message.entityId);
+
+            if (entity instanceof LivingEntity living)
+            {
+                EntityTempManager.getTemperatureCap(living).ifPresent(cap ->
+                {   cap.deserializeModifiers(message.modifiers);
+                });
+            }
+        });
+    }
+
+    @Override
+    public Type<? extends CustomPacketPayload> type()
+    {   return TYPE;
+    }
+}

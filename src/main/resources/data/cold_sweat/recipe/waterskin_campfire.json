@@ -1,0 +1,10 @@
+{
+    "type":  "minecraft:campfire_cooking",
+    "cookingtime":  1200,
+    "experience":  0,
+    "ingredient":  "cold_sweat:filled_waterskin",
+    "result":  {
+                   "id":  "cold_sweat:filled_waterskin",
+                   "count":  1
+               }
+}

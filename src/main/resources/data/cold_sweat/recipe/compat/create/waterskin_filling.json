@@ -1,0 +1,21 @@
+{
+  "type": "create:filling",
+  "fabric:load_conditions": [
+    {
+      "condition": "fabric:all_mods_loaded",
+      "values": [
+        "create"
+      ]
+    }
+  ],
+  "ingredient": "cold_sweat:waterskin",
+  "fluid_ingredient": {
+    "type": "fluid_stack",
+    "fluid": "minecraft:water",
+    "amount": 250
+  },
+  "result": {
+    "id": "cold_sweat:filled_waterskin",
+    "count": 1
+  }
+}

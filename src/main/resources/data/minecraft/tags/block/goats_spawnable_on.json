@@ -1,0 +1,9 @@
+{
+  "replace": false,
+  "values": [
+    "#c:stones",
+    "#minecraft:dirt",
+    "#c:cobblestones",
+    "#minecraft:valid_spawn"
+  ]
+}

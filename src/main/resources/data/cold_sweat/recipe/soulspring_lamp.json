@@ -1,0 +1,18 @@
+{
+    "type":  "minecraft:crafting_shaped",
+    "pattern":  [
+                    " G ",
+                    "IHI",
+                    " C "
+                ],
+    "key":  {
+                "I":  "#c:ingots/iron",
+                "G":  "#c:nuggets/gold",
+                "H":  "minecraft:heart_of_the_sea",
+                "C":  "#c:chains"
+            },
+    "result":  {
+                   "id":  "cold_sweat:soulspring_lamp",
+                   "count":  1
+               }
+}

@@ -1,0 +1,15 @@
+{
+    "type":  "minecraft:crafting_shaped",
+    "pattern":  [
+                    "F F",
+                    "FFF",
+                    "FFF"
+                ],
+    "key":  {
+                "F":  "#c:furs/goat"
+            },
+    "result":  {
+                   "id":  "cold_sweat:goat_fur_chestplate",
+                   "count":  1
+               }
+}

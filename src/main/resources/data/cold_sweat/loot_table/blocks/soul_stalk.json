@@ -1,0 +1,42 @@
+{
+  "type": "minecraft:block",
+  "pools": [
+    {
+      "rolls": 1,
+      "entries": [
+        {
+          "type": "minecraft:item",
+          "name": "cold_sweat:soul_sprout",
+          "conditions": [
+            {
+              "condition": "minecraft:any_of",
+              "terms": [
+                {
+                  "condition": "minecraft:block_state_property",
+                  "block": "cold_sweat:soul_stalk",
+                  "properties": {
+                    "section": "bud"
+                  }
+                },
+                {
+                  "condition": "minecraft:block_state_property",
+                  "block": "cold_sweat:soul_stalk",
+                  "properties": {
+                    "section": "top"
+                  }
+                },
+                {
+                  "condition": "minecraft:block_state_property",
+                  "block": "cold_sweat:soul_stalk",
+                  "properties": {
+                    "section": "middle_sprout"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

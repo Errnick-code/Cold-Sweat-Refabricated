@@ -1,0 +1,83 @@
+plugins {
+    id 'net.fabricmc.fabric-loom' version "${loom_version}"
+    id 'maven-publish'
+}
+
+version = project.mod_version
+group = project.maven_group
+
+base {
+    archivesName = project.archives_base_name
+}
+
+loom {
+    accessWidenerPath = file("src/main/resources/coldsweat.accesswidener")
+}
+
+repositories {
+    mavenCentral()
+    maven { url = "https://api.modrinth.com/maven" }
+    maven { url = "https://maven.nucleoid.xyz/releases" }
+}
+
+dependencies {
+    minecraft "com.mojang:minecraft:${minecraft_version}"
+    implementation "net.fabricmc:fabric-loader:${loader_version}"
+    implementation "net.fabricmc.fabric-api:fabric-api:${fabric_version}"
+    compileOnly "com.google.code.findbugs:jsr305:3.0.2"
+    compileOnly "maven.modrinth:serene-seasons:26.1.2.0.7"
+    compileOnly "maven.modrinth:glitchcore:26.1.2.0.2"
+    compileOnly "eu.pb4:trinkets:4.0.1+26.1"
+    compileOnly "com.electronwill.night-config:core:3.6.7"
+    compileOnly "maven.modrinth:create-fly:26.1.2-6.0.9-4"
+    compileOnly "maven.modrinth:thirst-was-taken-2:1.9.0+26.1.2"
+}
+
+processResources {
+    inputs.property "version", project.version
+    inputs.property "minecraft_version", project.minecraft_version
+    inputs.property "loader_version", project.loader_version
+    inputs.property "fabric_version", project.fabric_version
+
+    filesMatching("fabric.mod.json") {
+        expand "version": inputs.properties.version,
+                "minecraft_version": inputs.properties.minecraft_version,
+                "loader_version": inputs.properties.loader_version,
+                "fabric_version": inputs.properties.fabric_version
+    }
+}
+
+sourceSets.main.java {
+    exclude "com/momosoftworks/coldsweat/compat/create/ColdSweatPonderPlugin.java"
+    exclude "com/momosoftworks/coldsweat/mixin/compat/MixinCreateOverlay.java"
+    exclude "com/momosoftworks/coldsweat/mixin/compat/MixinKubeScanner.java"
+    exclude "com/momosoftworks/coldsweat/mixin/compat/MixinSpoiledIcebox.java"
+    exclude "com/momosoftworks/coldsweat/mixin/compat/MixinTaNThermoregulator.java"
+    exclude "com/momosoftworks/coldsweat/mixin_public/**"
+    exclude "com/momosoftworks/coldsweat/api/temperature/modifier/compat/CuriosTempModifier.java"
+    exclude "com/momosoftworks/coldsweat/api/temperature/modifier/compat/StormTempModifier.java"
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.release = 25
+    options.encoding = "UTF-8"
+    options.compilerArgs << "-Xmaxerrs" << "10000"
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+
+    sourceCompatibility = JavaVersion.VERSION_25
+    targetCompatibility = JavaVersion.VERSION_25
+}
+
+publishing {
+    publications {
+        create("mavenJava", MavenPublication) {
+            artifactId = project.archives_base_name
+            from components.java
+        }
+    }
+}

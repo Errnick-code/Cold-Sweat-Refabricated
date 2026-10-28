@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "id": "cold_sweat",
+  "version": "${version}",
+  "name": "Cold Sweat",
+  "description": "Temperature system for Minecraft: heat, cold, insulation, hearths and more.",
+  "authors": ["iMikul", "chubbymomo", "skinnymomo", "Errnick_"],
+  "icon": "assets/cold_sweat/icon.png",
+  "license": "GPL-3.0-or-later",
+  "environment": "*",
+  "entrypoints": {
+    "main": ["com.momosoftworks.coldsweat.ColdSweat"],
+    "client": ["com.momosoftworks.coldsweat.client.ColdSweatClient"]
+  },
+  "accessWidener": "coldsweat.accesswidener",
+  "mixins": [
+    "cold_sweat.mixins.json",
+    { "config": "cold_sweat.client.mixins.json", "environment": "client" }
+  ],
+  "depends": {
+    "fabricloader": ">=${loader_version}",
+    "minecraft": "~${minecraft_version}",
+    "java": ">=25",
+    "fabric-api": "*"
+  },
+  "suggests": {
+    "sereneseasons": "*"
+  }
+}

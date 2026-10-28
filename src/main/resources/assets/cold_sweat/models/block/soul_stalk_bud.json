@@ -1,0 +1,48 @@
+{
+	"textures": {
+		"0": "cold_sweat:block/soul_stalk_bud",
+		"particle": "cold_sweat:block/soul_stalk_bud"
+	},
+    "elements": [
+      {
+        "from": [8, 0, 3.5],
+        "to": [8, 13, 12.5],
+        "rotation": {"angle": -45, "axis": "y", "origin": [8, 0, 8]},
+        "faces": {
+          "north": {"uv": [0, 0, 0, 11], "texture": "#missing"},
+          "east": {"uv": [0, 0, 8, 13], "texture": "#0"},
+          "south": {"uv": [0, 0, 0, 11], "texture": "#missing"},
+          "west": {"uv": [0, 0, 8, 13], "texture": "#0"},
+          "up": {"uv": [0, 0, 0, 9], "texture": "#missing"},
+          "down": {"uv": [0, 0, 0, 9], "texture": "#missing"}
+        }
+      },
+      {
+        "from": [3.5, 0, 8],
+        "to": [12.5, 13, 8],
+        "rotation": {"angle": -45, "axis": "y", "origin": [8, 0, 8]},
+        "faces": {
+          "north": {"uv": [0, 0, 8, 13], "texture": "#0"},
+          "east": {"uv": [0, 0, 0, 11], "texture": "#missing"},
+          "south": {"uv": [0, 0, 8, 13], "texture": "#0"},
+          "west": {"uv": [0, 0, 0, 11], "texture": "#missing"},
+          "up": {"uv": [0, 0, 0, 9], "rotation": 90, "texture": "#missing"},
+          "down": {"uv": [0, 0, 0, 9], "rotation": 270, "texture": "#missing"}
+        }
+      },
+      {
+        "from": [5.5, 8, 5.5],
+        "to": [10.5, 13, 10.5],
+        "rotation": {"angle": 0, "axis": "y", "origin": [5, 8, 5]},
+        "faces": {
+          "north": {"uv": [11, 0, 16, 5], "texture": "#0"},
+          "east": {"uv": [11, 0, 16, 5], "texture": "#0"},
+          "south": {"uv": [11, 0, 16, 5], "texture": "#0"},
+          "west": {"uv": [11, 0, 16, 5], "texture": "#0"},
+          "up": {"uv": [11, 5, 16, 10], "texture": "#0"},
+          "down": {"uv": [11, 10, 16, 15], "texture": "#0"}
+        }
+      }
+    ],
+    "render_type": "cutout"
+}

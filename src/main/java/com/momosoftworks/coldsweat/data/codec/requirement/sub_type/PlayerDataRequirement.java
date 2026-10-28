@@ -1,0 +1,225 @@
+package com.momosoftworks.coldsweat.data.codec.requirement.sub_type;
+
+import com.mojang.datafixers.util.Either;
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import com.mojang.serialization.JsonOps;
+import com.mojang.serialization.codecs.RecordCodecBuilder;
+import com.momosoftworks.coldsweat.data.codec.requirement.EntityRequirement;
+import com.momosoftworks.coldsweat.data.codec.impl.RequirementHolder;
+import com.momosoftworks.coldsweat.data.codec.util.IntegerBounds;
+import com.momosoftworks.coldsweat.data.codec.util.NegatableList;
+import com.momosoftworks.coldsweat.util.entity.EntityHelper;
+import net.minecraft.advancements.AdvancementProgress;
+import net.minecraft.advancements.CriterionProgress;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.stats.Stat;
+import net.minecraft.stats.StatType;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.projectile.ProjectileUtil;
+import net.minecraft.world.level.GameType;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.EntityHitResult;
+import net.minecraft.world.phys.HitResult;
+import net.minecraft.world.phys.Vec3;
+
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
+public record PlayerDataRequirement(IntegerBounds level, Optional<GameType> gameType, NegatableList<StatRequirement> stats,
+                                    Optional<Map<Identifier, Boolean>> recipes,
+                                    Optional<Map<Identifier, Either<AdvancementCompletionRequirement, AdvancementCriteriaRequirement>>> advancements,
+                                    EntityRequirement lookingAt) implements EntitySubRequirement, RequirementHolder
+{
+    @Override
+    public MapCodec<? extends EntitySubRequirement> getCodec()
+    {   return getCodec(EntityRequirement.getCodec());
+    }
+
+    public static MapCodec<PlayerDataRequirement> getCodec(Codec<EntityRequirement> lastCodec)
+    {
+        return RecordCodecBuilder.mapCodec(instance -> instance.group(
+                IntegerBounds.CODEC.optionalFieldOf("level", IntegerBounds.NONE).forGetter(requirement -> requirement.level),
+                GameType.CODEC.optionalFieldOf("game_mode").forGetter(PlayerDataRequirement::gameType),
+                NegatableList.listCodec(StatRequirement.CODEC).optionalFieldOf("stats", new NegatableList<>()).forGetter(PlayerDataRequirement::stats),
+                Codec.unboundedMap(Identifier.CODEC, Codec.BOOL).optionalFieldOf("recipes").forGetter(PlayerDataRequirement::recipes),
+                Codec.unboundedMap(Identifier.CODEC, Codec.either(AdvancementCompletionRequirement.CODEC, AdvancementCriteriaRequirement.CODEC)).optionalFieldOf("advancements").forGetter(PlayerDataRequirement::advancements),
+                lastCodec.optionalFieldOf("looking_at", EntityRequirement.NONE).forGetter(PlayerDataRequirement::lookingAt)
+        ).apply(instance, PlayerDataRequirement::new));
+    }
+
+    @Override
+    public boolean test(Entity entity, Level level, Vec3 position)
+    {
+        if (!(entity instanceof Player player)) return false;
+        ServerPlayer serverPlayer = EntityHelper.getServerPlayer(player);
+
+        if (!this.level.test(serverPlayer.experienceLevel))
+        {   return false;
+        }
+        if (gameType.isPresent() && serverPlayer.gameMode.getGameModeForPlayer() != gameType.get())
+        {   return false;
+        }
+        if (!stats.test(stat -> stat.test(stat.stat(), serverPlayer.getStats().getValue(stat.stat()))))
+        {   return false;
+        }
+        if (recipes.isPresent())
+        {
+            for (Map.Entry<Identifier, Boolean> entry : recipes.get().entrySet())
+            {
+                if (serverPlayer.getRecipeBook().contains(net.minecraft.resources.ResourceKey.create(net.minecraft.core.registries.Registries.RECIPE, entry.getKey())) != entry.getValue())
+                {   return false;
+                }
+            }
+        }
+        if (advancements.isPresent())
+        {
+            for (Map.Entry<Identifier, Either<AdvancementCompletionRequirement, AdvancementCriteriaRequirement>> entry : advancements.get().entrySet())
+            {
+                AdvancementProgress progress = serverPlayer.getAdvancements().getOrStartProgress(serverPlayer.level().getServer().getAdvancements().get(entry.getKey()));
+                if (entry.getValue().map(complete -> complete.test(progress), criteria -> criteria.test(progress)))
+                {   return false;
+                }
+            }
+        }
+        if (lookingAt != EntityRequirement.NONE)
+        {
+            Vec3 vec3 = player.getEyePosition();
+            Vec3 vec31 = player.getViewVector(1.0F);
+            Vec3 vec32 = vec3.add(vec31.x * 100.0D, vec31.y * 100.0D, vec31.z * 100.0D);
+            EntityHitResult entityhitresult = ProjectileUtil.getEntityHitResult(player.level(), player, vec3, vec32, (new AABB(vec3, vec32)).inflate(1.0D), (ent) -> !ent.isSpectator(), 0.0F);
+            if (entityhitresult == null || entityhitresult.getType() != HitResult.Type.ENTITY)
+            {   return false;
+            }
+
+            Entity hitEntity = entityhitresult.getEntity();
+            if (!this.lookingAt.test(hitEntity))
+            {   return false;
+            }
+        }
+        return true;
+    }
+
+    @Override
+    public String toString()
+    {   return CODEC.encodeStart(JsonOps.INSTANCE, this).result().map(Object::toString).orElse("serialize_failed");
+    }
+
+    @Override
+    public boolean equals(Object obj)
+    {
+        if (this == obj) return true;
+        if (obj == null || getClass() != obj.getClass()) return false;
+
+        PlayerDataRequirement that = (PlayerDataRequirement) obj;
+        return gameType.equals(that.gameType)
+            && stats.equals(that.stats)
+            && recipes.equals(that.recipes)
+            && advancements.equals(that.advancements)
+            && lookingAt.equals(that.lookingAt);
+    }
+
+    public record StatRequirement(StatType<?> type, Identifier statId, Stat<?> stat, IntegerBounds value)
+    {
+        public static final Codec<StatRequirement> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+                BuiltInRegistries.STAT_TYPE.byNameCodec().fieldOf("type").forGetter(stat -> stat.type),
+                Identifier.CODEC.fieldOf("stat").forGetter(stat -> stat.statId),
+                IntegerBounds.CODEC.fieldOf("value").forGetter(stat -> stat.value)
+        ).apply(instance, StatRequirement::new));
+
+        public StatRequirement(StatType<?> type, Identifier statId, IntegerBounds value)
+        {   this(type, statId, (Stat<?>) type.getRegistry().getValue(statId), value);
+        }
+
+        public StatType<?> type()
+        {   return this.type;
+        }
+        public Stat<?> stat()
+        {   return this.stat;
+        }
+        public IntegerBounds value()
+        {   return this.value;
+        }
+
+        public boolean test(Stat<?> stat, int value)
+        {   return stat.getType() == type && this.stat.equals(stat) && this.value.test(value);
+        }
+
+        @Override
+        public boolean equals(Object obj)
+        {
+            if (this == obj) return true;
+            if (obj == null || getClass() != obj.getClass()) return false;
+
+            StatRequirement that = (StatRequirement) obj;
+            return type.equals(that.type)
+                && statId.equals(that.statId)
+                && value.equals(that.value);
+        }
+
+        @Override
+        public String toString()
+        {   return CODEC.encodeStart(JsonOps.INSTANCE, this).result().map(Object::toString).orElse("serialize_failed");
+        }
+    }
+
+    public record AdvancementCompletionRequirement(Boolean complete)
+    {
+        public static final Codec<AdvancementCompletionRequirement> CODEC = Codec.BOOL.xmap(AdvancementCompletionRequirement::new, AdvancementCompletionRequirement::complete);
+
+        public boolean test(AdvancementProgress progress)
+        {   return progress.isDone() == this.complete;
+        }
+
+        @Override
+        public String toString()
+        {   return CODEC.encodeStart(JsonOps.INSTANCE, this).result().map(Object::toString).orElse("serialize_failed");
+        }
+
+        @Override
+        public boolean equals(Object obj)
+        {
+            if (this == obj) return true;
+            if (obj == null || getClass() != obj.getClass()) return false;
+
+            AdvancementCompletionRequirement that = (AdvancementCompletionRequirement) obj;
+            return complete.equals(that.complete);
+        }
+    }
+    public record AdvancementCriteriaRequirement(Map<String, Boolean> criteria)
+    {
+        public static final Codec<AdvancementCriteriaRequirement> CODEC = Codec.unboundedMap(Codec.STRING, Codec.BOOL).xmap(AdvancementCriteriaRequirement::new, AdvancementCriteriaRequirement::criteria);
+
+        public boolean test(AdvancementProgress progress)
+        {
+            for (Map.Entry<String, Boolean> entry : this.criteria.entrySet())
+            {
+                CriterionProgress criterionprogress = progress.getCriterion(entry.getKey());
+                if (criterionprogress == null || criterionprogress.isDone() != entry.getValue())
+                {   return false;
+                }
+            }
+            return true;
+        }
+
+        @Override
+        public String toString()
+        {   return CODEC.encodeStart(JsonOps.INSTANCE, this).result().map(Object::toString).orElse("serialize_failed");
+        }
+
+        @Override
+        public boolean equals(Object obj)
+        {
+            if (this == obj) return true;
+            if (obj == null || getClass() != obj.getClass()) return false;
+
+            AdvancementCriteriaRequirement that = (AdvancementCriteriaRequirement) obj;
+            return criteria.equals(that.criteria);
+        }
+    }
+}

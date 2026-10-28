@@ -1,0 +1,18 @@
+{
+    "type":  "minecraft:crafting_shaped",
+    "pattern":  [
+                    " # ",
+                    "BBB",
+                    "SIS"
+                ],
+    "key":  {
+                "#":  "cold_sweat:smokestack",
+                "B":  "#c:ingots/nether_brick",
+                "S":  "#minecraft:soul_fire_base_blocks",
+                "I":  "#c:ingots/iron"
+            },
+    "result":  {
+                   "id":  "cold_sweat:hearth",
+                   "count":  1
+               }
+}

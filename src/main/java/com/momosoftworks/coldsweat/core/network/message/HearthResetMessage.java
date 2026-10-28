@@ -1,0 +1,48 @@
+package com.momosoftworks.coldsweat.core.network.message;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import com.momosoftworks.coldsweat.common.blockentity.HearthBlockEntity;
+import com.momosoftworks.coldsweat.util.ClientOnlyHelper;
+import com.momosoftworks.coldsweat.core.network.CSNetContext;
+
+import com.momosoftworks.coldsweat.ColdSweat;
+import net.minecraft.core.BlockPos;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.resources.Identifier;
+
+public class HearthResetMessage implements CustomPacketPayload
+{
+    public static final CustomPacketPayload.Type<HearthResetMessage> TYPE = new CustomPacketPayload.Type<>(Identifier.fromNamespaceAndPath(ColdSweat.MOD_ID, "hearth_reset"));
+    public static final StreamCodec<FriendlyByteBuf, HearthResetMessage> CODEC = CustomPacketPayload.codec(HearthResetMessage::encode, HearthResetMessage::decode);
+
+    BlockPos blockPos;
+
+    public HearthResetMessage(BlockPos blockPos)
+    {   this.blockPos = blockPos;
+    }
+
+    public void encode(FriendlyByteBuf buffer)
+    {   buffer.writeBlockPos(this.blockPos);
+    }
+
+    public static HearthResetMessage decode(FriendlyByteBuf buffer)
+    {   return new HearthResetMessage(buffer.readBlockPos());
+    }
+
+    public static void handle(HearthResetMessage message, CSNetContext context)
+    {
+        context.enqueueWork(() ->
+        {
+            BlockEntity te = ClientOnlyHelper.getClientLevel().getBlockEntity(message.blockPos);
+            if (te instanceof HearthBlockEntity hearth)
+            {   hearth.resetPaths();
+            }
+        });
+    }
+
+    @Override
+    public Type<? extends CustomPacketPayload> type()
+    {   return TYPE;
+    }
+}

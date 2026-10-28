@@ -1,0 +1,8 @@
+{
+  "replace": false,
+  "values":
+  [
+    "cold_sweat:cold",
+    "cold_sweat:hot"
+  ]
+}

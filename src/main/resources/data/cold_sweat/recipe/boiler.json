@@ -1,0 +1,16 @@
+{
+    "type":  "minecraft:crafting_shaped",
+    "pattern":  [
+                    "CCC",
+                    "C C",
+                    "DDD"
+                ],
+    "key":  {
+                "C":  "#c:cobblestones/normal",
+                "D":  "#cold_sweat:boiler_craftable_deepslate"
+            },
+    "result":  {
+                   "id":  "cold_sweat:boiler",
+                   "count":  1
+               }
+}

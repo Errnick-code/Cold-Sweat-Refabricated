@@ -1,0 +1,16 @@
+{
+    "type":  "minecraft:crafting_shaped",
+    "pattern":  [
+                    "MT ",
+                    "MT ",
+                    "MTT"
+                ],
+    "key":  {
+                "M":  "#c:scales/chameleon",
+                "T":  "#minecraft:terracotta"
+            },
+    "result":  {
+                   "id":  "cold_sweat:thermolith",
+                   "count":  1
+               }
+}

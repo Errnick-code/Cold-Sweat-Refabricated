@@ -1,0 +1,29 @@
+# Gradle
+.gradle/
+build/
+out/
+
+# Fabric dev environment
+run/
+logs/
+crash-reports/
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.classpath
+.project
+.settings/
+
+# Java
+*.class
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local
+*.log
